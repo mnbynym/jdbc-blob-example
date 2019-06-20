@@ -6,7 +6,7 @@
 - [MariaDBのBLOB型ドキュメント](https://mariadb.com/kb/en/library/blob/)
 - [MySQL 5.6のBLOB型ドキュメント(日本語)](https://dev.mysql.com/doc/refman/5.6/ja/blob.html)
 
-注意）ファイル･サイズによってデータ型を使い分けること
+注意）「Data too long for column」という例外メッセージが表示される場合にはファイル･サイズを確認して適切なデータ型を選択すること。
 - TINYBLOB   :     maximum length of 255 bytes  
 - BLOB       :     maximum length of 65,535 bytes  
 - MEDIUMBLOB :     maximum length of 16,777,215 bytes  
