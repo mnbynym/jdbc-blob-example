@@ -6,6 +6,12 @@
 - [MariaDBのBLOB型ドキュメント](https://mariadb.com/kb/en/library/blob/)
 - [MySQL 5.6のBLOB型ドキュメント(日本語)](https://dev.mysql.com/doc/refman/5.6/ja/blob.html)
 
+注意）ファイル･サイズによってデータ型を使い分けること
+- TINYBLOB   :     maximum length of 255 bytes  
+- BLOB       :     maximum length of 65,535 bytes  
+- MEDIUMBLOB :     maximum length of 16,777,215 bytes  
+- LONGBLOB   :     maximum length of 4,294,967,295 bytes  
+
 ## JDBCを使用したBLOBデータの保存
 - 保存するデータを扱うJava側のデータ型は `java.io.InputStream` 型を使用
 - ファイルを扱う場合には `InputStream` のサブ・クラスである `FileInputStream` クラスを使用
