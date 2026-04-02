@@ -1,10 +1,10 @@
 package example;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -13,41 +13,41 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * BLOB（Binary Large Object）を扱うサンプル・プログラム。
- * 事前に以下テーブルを作成しておくこと。 <br>
- * CREATE TABLE blobsample(id INT PRIMARY KEY, image BLOB);
- * サンプル画像はプロジェクト直下の「img」フォルダに配置しておく。
- * 指摘事項（リソース管理順序、バッファ利用）を反映済み。
+ * BLOB（Binary Large Object）を扱うJava 26推奨サンプル・プログラム。
+ * 仮想スレッド、NIO.2、およびStream転送APIを利用。
  */
 public class Main {
-
-    // Specify your database configurations --------------------------
+    
+    // DB接続設定（実務では環境変数や設定ファイル管理を推奨）
     private final static String URL = "jdbc:mariadb://localhost/test";
     private final static String USER = "root";
     private final static String PASS = "mariadb";
-    //----------------------------------------------------------------
+    
+    // ファイルパスの定義
+    private final static Path INPUT_PATH = Path.of("img/sample.png");
+    private final static Path OUTPUT_PATH = Path.of("img/sample_copy.png");
 
     /**
-     * 最初にsaveImageToDbを実行してデータベースに画像を格納。
-     * 次にsaveImageToDbをコメントアウト
-     * 以下retrieveImageFromDbメソッドをコメントインして実行し、
-     * データベースから格納されている画像を取り出し（コピーを作成して出力）
-     * Eclipseのプロジェクトに表示されない場合にはF5キーでリフレッシュ
+     * メインメソッド。
+     * ブロッキングI/Oを伴うため、仮想スレッド上で実行することでスケーラビリティを確保。
      */
     public static void main(String[] args) {
-        saveImageToDb();
-        // retrieveImageFromDb();
+        Thread.ofVirtual().start(() -> {
+            saveImageToDb();
+            retrieveImageFromDb();
+        }).join(); // サンプルのため終了を待機
     }
 
     /**
-     * 画像ファイルをDBに保存する。
+     * 画像ファイルをDBに保存。
+     * Files.newInputStream と PreparedStatement を使用。
      */
     static void saveImageToDb() {
-        String sql = "INSERT INTO blobsample (id, image) VALUES (1, ?)";
+        final String sql = "INSERT INTO blobsample (id, image) VALUES (1, ?)";
 
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
              PreparedStatement pstmt = conn.prepareStatement(sql);
-             InputStream in = new FileInputStream("img/sample.png")) {
+             InputStream in = Files.newInputStream(INPUT_PATH)) {
 
             pstmt.setBlob(1, in);
             pstmt.executeUpdate();
@@ -55,45 +55,40 @@ public class Main {
             System.out.println("Successfully saved the image to the database.");
 
         } catch (SQLException | IOException e) {
+            // 実務ではロガー（SLF4J等）を使用
             e.printStackTrace();
         }
     }
     
     /**
      * DBから画像を取得し、ファイルとして書き出す。
+     * Files.copy を用いて、ストリームからパスへ直接転送。
      */
     static void retrieveImageFromDb() {
-        String sql = "SELECT image FROM blobsample WHERE id = 1";
+        final String sql = "SELECT image FROM blobsample WHERE id = 1";
 
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             if (rs.next()) {
-                // ResultSetのカーソルを進める前にInputStreamを取得すると、
-                // ドライバの種類によってはエラーが発生する可能性があるため
-                // ここでInputStreamを取得する
                 try (InputStream in = rs.getBinaryStream("image")) {
                     if (in != null) {
-                        // データがある時だけファイルをオープンして書き込む
-                        try (OutputStream out = new FileOutputStream("img/sample_copy.png")) {
-                            // 1バイトずつ読み書き（read() / write()）を行うと、
-                            // ファイルサイズが大きい場合に処理が低速になる。
-                            // バッファを利用して効率的に読み書きを実行
-                            byte[] buffer = new byte[8192];
-                            int bytesRead;
-                            while ((bytesRead = in.read(buffer)) != -1) {
-                                out.write(buffer, 0, bytesRead);
-                            }
+                        // 出力先ディレクトリの存在確認と作成
+                        if (OUTPUT_PATH.getParent() != null) {
+                            Files.createDirectories(OUTPUT_PATH.getParent());
                         }
-                        System.out.println("Successfully retrieved the image.");
+                        
+                        // ストリームの内容を直接ファイルへコピー（バッファループ不要）
+                        Files.copy(in, OUTPUT_PATH, StandardCopyOption.REPLACE_EXISTING);
+                        System.out.println("Successfully retrieved the image to: " + OUTPUT_PATH.toAbsolutePath());
                     } else {
-                        System.out.println("Image data is null in the database.");
+                        System.out.println("Image data is NULL in the database.");
                     }
                 }
+            } else {
+                System.out.println("No record found with the specified ID.");
             }
-            
-            System.out.println("Successfully retrieved the image and created the copy.");
 
         } catch (SQLException | IOException e) {
             e.printStackTrace();
