@@ -71,7 +71,9 @@ public class Main {
              OutputStream out = new FileOutputStream("img/sample_copy.png")) {
 
             if (rs.next()) {
-                // ResultSetの後にInputStreamを取得することで、安全にリソースを扱う
+                // ResultSetのカーソルを進める前にInputStreamを取得すると、
+                // ドライバの種類によってはエラーが発生する可能性があるため
+                // ここでInputStreamを取得する
                 try (InputStream in = rs.getBinaryStream("image")) {
                     if (in != null) {
                         // 1バイトずつ読み書き（read() / write()）を行うと、
