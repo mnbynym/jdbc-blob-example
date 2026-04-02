@@ -67,8 +67,7 @@ public class Main {
 
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
              Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql);
-             OutputStream out = new FileOutputStream("img/sample_copy.png")) {
+             ResultSet rs = stmt.executeQuery(sql)) {
 
             if (rs.next()) {
                 // ResultSetのカーソルを進める前にInputStreamを取得すると、
@@ -76,14 +75,20 @@ public class Main {
                 // ここでInputStreamを取得する
                 try (InputStream in = rs.getBinaryStream("image")) {
                     if (in != null) {
-                        // 1バイトずつ読み書き（read() / write()）を行うと、
-                        // ファイルサイズが大きい場合に処理が低速になる。
-                        // バッファを利用して効率的に読み書きを実行
-                        byte[] buffer = new byte[8192];
-                        int bytesRead;
-                        while ((bytesRead = in.read(buffer)) != -1) {
-                            out.write(buffer, 0, bytesRead);
+                        // データがある時だけファイルをオープンして書き込む
+                        try (OutputStream out = new FileOutputStream("img/sample_copy.png")) {
+                            // 1バイトずつ読み書き（read() / write()）を行うと、
+                            // ファイルサイズが大きい場合に処理が低速になる。
+                            // バッファを利用して効率的に読み書きを実行
+                            byte[] buffer = new byte[8192];
+                            int bytesRead;
+                            while ((bytesRead = in.read(buffer)) != -1) {
+                                out.write(buffer, 0, bytesRead);
+                            }
                         }
+                        System.out.println("Successfully retrieved the image.");
+                    } else {
+                        System.out.println("Image data is null in the database.");
                     }
                 }
             }
