@@ -13,74 +13,69 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * <p>
  * BLOB（Binary Large Object）を扱うサンプル・プログラム。
-  *   事前に以下テーブルを作成しておくこと。 <br>
- * CREATE TABLE blobsample(id INT PRIMARY KEY, image BLOB);
-  *  サンプル画像はプロジェクト直下の「img」フォルダに配置済み
- * </p>
- * 
- * @author M.Yoneyama
- *
+ * 指摘事項（リソース管理順序、バッファ利用）を反映済み。
  */
 public class Main {
-	
-	// specify your database configurations
-	private final static String URL = "jdbc:mariadb://localhost/test";
-	private final static String USER = "root";
-	private final static String PASS = "mariadb";
+    
+    private final static String URL = "jdbc:mariadb://localhost/test";
+    private final static String USER = "root";
+    private final static String PASS = "mariadb";
 
-	/**
-	  *  最初にsaveImageToDbを実行してデータベースに画像を格納。
-	  *  次にsaveImageToDbをコメントアウトしてからretrieveImageFromDbをコメントインして実行し、
-	  *  データベースから格納されている画像を取り出し（コピーを作成して出力）
-	  *  出力された画像ファイルはプロジェクトをF5でリフレッシュしないと表示されない点に注意
-	 * @param args
-	 */
-	public static void main(String[] args) {
-		saveImageToDb();
-//		retrieveImageFromDb();
-	}
+    public static void main(String[] args) {
+        saveImageToDb();
+        // retrieveImageFromDb();
+    }
 
-	static void saveImageToDb() {
+    /**
+     * 画像ファイルをDBに保存する。
+     */
+    static void saveImageToDb() {
+        String sql = "INSERT INTO blobsample (id, image) VALUES (1, ?)";
 
-		String sql = "INSERT INTO blobsample VALUES(1, ?)";
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             InputStream in = new FileInputStream("img/sample.png")) {
 
-		try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
-			 PreparedStatement pstmt = conn.prepareStatement(sql);
-			 InputStream in = new FileInputStream("img/sample.png");) {
+            pstmt.setBlob(1, in);
+            pstmt.executeUpdate();
+            
+            System.out.println("Successfully saved the image to the database.");
 
-			pstmt.setBlob(1, in);
-			pstmt.execute();
-			
-			System.out.println("Successfully saves the image to the database.");
+        } catch (SQLException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * DBから画像を取得し、ファイルとして書き出す。
+     */
+    static void retrieveImageFromDb() {
+        String sql = "SELECT image FROM blobsample WHERE id = 1";
 
-		} catch (SQLException | IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	static void retrieveImageFromDb() {
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql);
+             OutputStream out = new FileOutputStream("img/sample_copy.png")) {
 
-		String sql = "SELECT image FROM blobsample WHERE id = 1";
+            if (rs.next()) {
+                // ResultSetの後にInputStreamを取得することで、安全にリソースを扱う
+                try (InputStream in = rs.getBinaryStream("image")) {
+                    if (in != null) {
+                        // バッファを利用して効率的に読み書きを実行
+                        byte[] buffer = new byte[8192];
+                        int bytesRead;
+                        while ((bytesRead = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, bytesRead);
+                        }
+                    }
+                }
+            }
+            
+            System.out.println("Successfully retrieved the image and created the copy.");
 
-		try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
-			 Statement stmt = conn.createStatement();
-			 ResultSet rs = stmt.executeQuery(sql);
-			 InputStream in = rs.getBinaryStream("image");
-			 OutputStream out = new FileOutputStream("img/sample_copy.png")) {
-
-			if (rs.next()) {
-				int bytes;
-				while ((bytes = in.read()) != -1) {
-					out.write(bytes);
-				}
-			}
-			
-			System.out.println("Successfully retrieves the image from the database and create the copy.");
-
-		} catch (SQLException | IOException e) {
-			System.err.println(e.getMessage());
-		}
-	}
+        } catch (SQLException | IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
