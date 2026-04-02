@@ -14,14 +14,26 @@ import java.sql.Statement;
 
 /**
  * BLOB（Binary Large Object）を扱うサンプル・プログラム。
+ * 事前に以下テーブルを作成しておくこと。 <br>
+ * CREATE TABLE blobsample(id INT PRIMARY KEY, image BLOB);
+ * サンプル画像はプロジェクト直下の「img」フォルダに配置しておく。
  * 指摘事項（リソース管理順序、バッファ利用）を反映済み。
  */
 public class Main {
-    
+
+    // Specify your database configurations --------------------------
     private final static String URL = "jdbc:mariadb://localhost/test";
     private final static String USER = "root";
     private final static String PASS = "mariadb";
+    //----------------------------------------------------------------
 
+    /**
+     * 最初にsaveImageToDbを実行してデータベースに画像を格納。
+     * 次にsaveImageToDbをコメントアウト
+     * 以下retrieveImageFromDbメソッドをコメントインして実行し、
+     * データベースから格納されている画像を取り出し（コピーを作成して出力）
+     * Eclipseのプロジェクトに表示されない場合にはF5キーでリフレッシュ
+     */
     public static void main(String[] args) {
         saveImageToDb();
         // retrieveImageFromDb();
@@ -62,6 +74,8 @@ public class Main {
                 // ResultSetの後にInputStreamを取得することで、安全にリソースを扱う
                 try (InputStream in = rs.getBinaryStream("image")) {
                     if (in != null) {
+                        // 1バイトずつ読み書き（read() / write()）を行うと、
+                        // ファイルサイズが大きい場合に処理が低速になる。
                         // バッファを利用して効率的に読み書きを実行
                         byte[] buffer = new byte[8192];
                         int bytesRead;
