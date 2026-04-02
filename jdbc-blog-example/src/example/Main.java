@@ -15,6 +15,29 @@ import java.sql.Statement;
 /**
  * BLOB（Binary Large Object）を扱うJava 26推奨サンプル・プログラム。
  * 仮想スレッド、NIO.2、およびStream転送APIを利用。
+ * 以下Java26に対応した変更点
+ * 仮想スレッド (Thread.ofVirtual):
+ * DBやファイル操作は「ブロッキングI/O」であり、仮想スレッド内で実行することで、
+ * OSスレッドを無駄に占有せず、リソース効率を最大化。
+ * 
+ * NIO.2 (java.nio.file.Path/Files):
+ * FileInputStream 等の古いクラスを排し、現代的な Path と Filesを採用。
+ * ファイルパスの扱いが安全になり、ディレクトリ作成なども容易。
+ * 
+ * Files.copy(InputStream, Path, ...):
+ * 自分で byte[] バッファを作成して while ループを回す必要がない。
+ * 内部で最適に実装されており、コードが極めて簡潔で読みやすい。
+ * 
+ * executeUpdate():
+ * 単なる execute() ではなく、更新系（INSERT/UPDATE/DELETE）
+ * に適したメソッドを明示的に使用。
+ * 
+ * ディレクトリの自動作成:
+ * Files.createDirectories() を追加し、
+ * 出力先フォルダが存在しない場合のエラーを防止。
+ * 
+ * リソース管理のネスト:
+ * ResultSet の後に InputStream を取得する構造を維持しつつ、Files.copy で安全に処理を完結。 
  */
 public class Main {
     
